@@ -1,0 +1,55 @@
+WITH table_1 AS (
+-- Информация о полётах и самолётах
+    select *
+    from dst_project.flights f
+            LEFT JOIN dst_project.aircrafts a on a.aircraft_code=f.aircraft_code
+),
+     table_2 AS (
+-- Информация о полётах и стоимости проданных билетов (группировка)
+        select flight_id, sum(amount) total_amount
+        from dst_project.ticket_flights
+        group by 1
+     ),
+
+     table_3 AS (
+-- Информация о полётах и кол-во проданных билетов на разные классы
+        select tf.flight_id,
+                count(case when tf.fare_conditions = 'Business' then tf.fare_conditions end) as ticket_business,
+                count(case when tf.fare_conditions = 'Comfort' then tf.fare_conditions end) as ticket_comfort,
+                count(case when tf.fare_conditions = 'Economy' then tf.fare_conditions end) as ticket_economy
+        from dst_project.ticket_flights as tf
+        group by 1
+        
+    
+     )
+
+-- Финальный запрос объединяет все  созданные таблицы в одну и выводит нужную информацию
+select f.flight_id,
+       f.flight_no,
+       f.departure_airport,
+       f.arrival_airport,
+       model,
+       tc.ticket_business ticket_business,
+       tc.ticket_comfort ticket_comfort,
+       tc.ticket_economy ticket_economy,
+       date_part('dow', f.scheduled_departure) as weekday,
+       --date_part('hour', f.scheduled_departure) as hour_day,
+       -- Находим продолжительность полета в минутах
+       case when date_part('hour', f.scheduled_arrival-f.scheduled_departure) = 0 then 
+                 date_part('minute', f.scheduled_arrival-f.scheduled_departure) 
+            else date_part('hour', f.scheduled_arrival-f.scheduled_departure)*60 +
+                 date_part('minute', f.scheduled_arrival-f.scheduled_departure) 
+        end flight_time,
+       --date_part('hour', f.scheduled_arrival-f.scheduled_departure)*60 -
+       --date_part('minute', f.scheduled_arrival-f.scheduled_departure) flight_time,
+       t.total_amount
+       
+
+FROM table_1 f
+         LEFT JOIN table_2 t ON t.flight_id=f.flight_id
+         LEFT JOIN table_3 tc ON tc.flight_id=f.flight_id
+         
+-- Не забываем про условие задачи
+WHERE departure_airport = 'AAQ'
+  AND (date_trunc('month', scheduled_departure) in ('2017-01-01', '2017-02-01', '2016-12-01'))
+  AND status not in ('Cancelled')
